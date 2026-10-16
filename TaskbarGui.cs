@@ -102,7 +102,6 @@ namespace WeekNumberLite
             _notifyIcon.Visible = false;
             if (_notifyIcon.Icon != null)
             {
-                NativeMethods.DestroyIcon(_notifyIcon.Icon.Handle);
                 _notifyIcon.Icon?.Dispose();
             }
             _notifyIcon.ContextMenu?.MenuItems.Clear();
