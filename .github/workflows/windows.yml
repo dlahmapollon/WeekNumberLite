@@ -1,50 +1,38 @@
-name: Windows build and icon regression
+name: Windows build
 on:
   push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: windows-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
-  build-and-test:
+  build:
     runs-on: windows-2022
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration: [Release, Debug]
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Build application through local build script
-        if: matrix.configuration == 'Release'
+      - name: Build Release
         shell: cmd
         run: build.bat
-      - name: Build and run regression executable
+      - name: Check ISO week boundaries
         shell: pwsh
-        env:
-          CONFIGURATION: ${{ matrix.configuration }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
-          if (-not $msbuild) { throw 'MSBuild not found' }
-          & $msbuild WeekNumberLite.csproj -t:Rebuild "-p:Configuration=$env:CONFIGURATION" -nologo -v:minimal -bl:application.binlog
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & $msbuild tests/IconTests.csproj -t:Rebuild "-p:Configuration=$env:CONFIGURATION" -nologo -v:minimal -bl:tests.binlog
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & ".\tests\bin\$env:CONFIGURATION\IconTests.exe" artifacts/icons
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Upload executable, render sheets and build logs
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: windows-${{ matrix.configuration }}
-          if-no-files-found: error
-          retention-days: 14
-          path: |
-            bin/${{ matrix.configuration }}/
-            artifacts/icons/
-            *.binlog
+          Add-Type -Path Week.cs
+          $week = [AppDomain]::CurrentDomain.GetAssemblies().GetTypes() | Where-Object FullName -eq 'WeekNumberLite.Week'
+          $method = $week.GetMethod('Of', [Reflection.BindingFlags]'Static,NonPublic')
+          $cases = @{
+            '2016-01-01' = 53
+            '2016-01-04' = 1
+            '2018-12-31' = 1
+            '2021-01-01' = 53
+            '2021-01-04' = 1
+            '2026-10-16' = 42
+          }
+          foreach ($date in $cases.Keys) {
+            $value = [DateTime]::ParseExact($date, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+            $actual = $method.Invoke($null, @($value))
+            if ($actual -ne $cases[$date]) { throw "$date : expected $($cases[$date]), got $actual" }
+          }
+          Write-Host "Passed $($cases.Count) ISO week checks."

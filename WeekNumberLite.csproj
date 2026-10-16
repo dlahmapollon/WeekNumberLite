@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -24,6 +24,10 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
+  </PropertyGroup>
+  <!-- Without the .NET Framework 4.8 Developer Pack, compile against the runtime assemblies that ship with Windows. -->
+  <PropertyGroup Condition="!Exists('$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8')">
+    <FrameworkPathOverride>$(WinDir)\Microsoft.NET\Framework64\v4.0.30319</FrameworkPathOverride>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />

@@ -8,5 +8,5 @@ if not defined MSBUILD goto missing_msbuild
 exit /b %errorlevel%
 
 :missing_msbuild
-echo ERROR: MSBuild was not found. Install Visual Studio Build Tools with MSBuild and the .NET Framework 4.8 Developer Pack. 1>&2
+echo ERROR: MSBuild was not found. Install Visual Studio Build Tools with MSBuild. 1>&2
 exit /b 1
