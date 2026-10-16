@@ -1,0 +1,38 @@
+name: Windows build
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build Release
+        shell: cmd
+        run: build.bat
+      - name: Check ISO week boundaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Add-Type -Path Week.cs
+          $week = [AppDomain]::CurrentDomain.GetAssemblies().GetTypes() | Where-Object FullName -eq 'WeekNumberLite.Week'
+          $method = $week.GetMethod('Of', [Reflection.BindingFlags]'Static,NonPublic')
+          $cases = @{
+            '2016-01-01' = 53
+            '2016-01-04' = 1
+            '2018-12-31' = 1
+            '2021-01-01' = 53
+            '2021-01-04' = 1
+            '2026-10-16' = 42
+          }
+          foreach ($date in $cases.Keys) {
+            $value = [DateTime]::ParseExact($date, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+            $actual = $method.Invoke($null, @($value))
+            if ($actual -ne $cases[$date]) { throw "$date : expected $($cases[$date]), got $actual" }
+          }
+          Write-Host "Passed $($cases.Count) ISO week checks."
