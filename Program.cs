@@ -1,78 +1,33 @@
-﻿#region Using statements
-
-using System;
-using System.Runtime;
+﻿using System;
 using System.Threading;
 using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
-
-#endregion Using statements
 
 namespace WeekNumberLite
 {
-    internal class Program
+    internal static class Program
     {
-        #region Private variable to allow only one instance of application
-
-        private static readonly Mutex Mutex = new Mutex(true, "88D1C6E0-96C8-4BB3-BA08-ACEFDC90A023");
-
-        #endregion Private variable to allow only one instance of application
-
-        #region Application starting point
-
         [STAThread]
         private static void Main()
         {
-            if (!Mutex.WaitOne(TimeSpan.Zero, true)) return;
-            WeekApplicationContext context = null;
-            try
+            using (new Mutex(true, "88D1C6E0-96C8-4BB3-BA08-ACEFDC90A023", out bool firstInstance))
             {
-                AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionTrapper;
-                SetGCSettings();
+                if (!firstInstance) return;
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+                AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
                 Application.EnableVisualStyles();
-                Application.VisualStyleState = VisualStyleState.ClientAndNonClientAreasEnabled;
                 Application.SetCompatibleTextRenderingDefault(false);
-                context = new WeekApplicationContext();
-                if (context?.Gui != null) Application.Run(context);
-            }
-            finally
-            {
-                context?.Dispose();
-                Mutex.ReleaseMutex();
+                // There is no form, so install the context explicitly; SystemEvents
+                // then raise their events on this UI thread.
+                SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+                using (TrayApplication application = new TrayApplication())
+                    Application.Run(application);
             }
         }
 
-        #endregion Application starting point
-
-        #region Private methods
-
-        /// <summary>
-        /// Configures garbarge collection settings
-        /// </summary>
-        private static void SetGCSettings()
+        private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GCSettings.LatencyMode = GCLatencyMode.Batch;
-        }
-
-        #endregion Private methods that configures garbarge collection settings
-
-        #region Global unhandled Exception trap
-
-        /// <summary>
-        /// Catches all unhandled exceptions for the application
-        /// Writes the exception to the application log file
-        /// Terminates the application with exit code -1
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private static void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)
-        {
-            Exception ex = (Exception)e.ExceptionObject;
-            Message.Show(Resources.UnhandledException, ex);
+            MessageBox.Show(e.ExceptionObject.ToString(), "WeekNumber Lite", MessageBoxButtons.OK, MessageBoxIcon.Error);
             Environment.Exit(1);
         }
-
-        #endregion Global unhandled Exception trap
     }
 }

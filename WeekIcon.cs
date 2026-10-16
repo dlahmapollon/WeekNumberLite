@@ -1,28 +1,30 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Text;
 using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace WeekNumberLite
 {
     internal static class WeekIcon
     {
-        internal static Icon GetIcon(int weekNumber)
+        private const float EmSize = 180;
+
+        internal static Icon Create(int weekNumber)
         {
             // Keep a minimal calendar header above large, fitted digits.
-            int size = System.Windows.Forms.SystemInformation.SmallIconSize.Width;
+            int size = SystemInformation.SmallIconSize.Width;
             using (Bitmap canvas = new Bitmap(size * 4, size * 4))
             using (Graphics graphics = Graphics.FromImage(canvas))
             {
                 graphics.Clear(Color.Transparent);
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                 graphics.ScaleTransform(canvas.Width / 256f, canvas.Height / 256f);
                 Color color = GetForegroundColor();
                 using (Brush brush = new SolidBrush(color))
-                using (Font font = new Font("Segoe UI", 180, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (FontFamily family = new FontFamily("Segoe UI"))
                 using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
                 using (GraphicsPath number = new GraphicsPath())
                 {
@@ -31,7 +33,7 @@ namespace WeekNumberLite
                     RectangleF digitBounds;
                     using (GraphicsPath reference = new GraphicsPath())
                     {
-                        reference.AddString("0", font.FontFamily, (int)FontStyle.Bold, font.Size, Point.Empty, format);
+                        reference.AddString("0", family, (int)FontStyle.Bold, EmSize, Point.Empty, format);
                         digitBounds = reference.GetBounds();
                     }
                     float inset = 128f / size;
@@ -43,7 +45,7 @@ namespace WeekNumberLite
                     {
                         using (GraphicsPath digit = new GraphicsPath())
                         {
-                            digit.AddString(digits.Substring(index, 1), font.FontFamily, (int)FontStyle.Bold, font.Size, Point.Empty, format);
+                            digit.AddString(digits[index].ToString(), family, (int)FontStyle.Bold, EmSize, Point.Empty, format);
                             RectangleF bounds = digit.GetBounds();
                             float x = inset + index * (cellWidth + gap) + (cellWidth - bounds.Width * scale) / 2;
                             float y = top + (256 - top - inset - digitBounds.Height * scale) / 2;
@@ -74,16 +76,9 @@ namespace WeekNumberLite
                         using (Icon borrowed = Icon.FromHandle(handle))
                             return (Icon)borrowed.Clone();
                     }
-                    finally { NativeMethods.DestroyIcon(handle); }
+                    finally { DestroyIcon(handle); }
                 }
             }
-        }
-
-        internal static void CleanupIcon(ref Icon icon)
-        {
-            if (icon == null) return;
-            icon.Dispose();
-            icon = null;
         }
 
         private static Color GetForegroundColor()
@@ -93,5 +88,8 @@ namespace WeekNumberLite
                     ? Color.FromArgb(48, 52, 58) : Color.FromArgb(240, 240, 240);
         }
 
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyIcon(IntPtr handle);
     }
 }

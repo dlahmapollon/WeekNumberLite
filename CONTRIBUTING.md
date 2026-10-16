@@ -1,1 +1,0 @@
-Feel free to fork this branch and contribute to the application by modifications or additions to its logic, all merge requests will be evaluated and if deemed fit merged into the master branch/included in future release
