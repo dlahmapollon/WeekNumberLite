@@ -1,3 +1,5 @@
+This repository is a fork of [voltura/WeekNumberLite](https://github.com/voltura/WeekNumberLite).
+
 🌍[English](README.md) ∙ [Svenska](README.sv-SE.md)
 
 # WeekNumber Lite
