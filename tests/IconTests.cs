@@ -99,6 +99,8 @@ internal static class IconTests
                     for (int half = 0; half < 2; half++)
                     {
                         Check(digitPixels[half] >= size * size / 40, context + " digit ink");
+                        Check(minY[half] <= size / 2, context + " digit starts within upper half");
+                        Check(maxY[half] < size - 1, context + " digit core not clipped at bottom");
                         Check(maxY[half] - minY[half] >= size / 3, context + " digit height");
                     }
                     // A fully transparent central column keeps the two digits separate.

@@ -77,7 +77,7 @@ namespace WeekNumberLite
                             float x = inset + index * (cellWidth + gap) + (cellWidth - bounds.Width * scale) / 2;
                             float y = top + (256 - top - inset - digitBounds.Height * scale) / 2;
                             using (Matrix transform = new Matrix(scale, 0, 0, scale,
-                                x - bounds.X * scale, y - digitBounds.Y * scale))
+                                x - bounds.X * scale, y - bounds.Y * scale))
                                 digit.Transform(transform);
                             number.AddPath(digit, false);
                         }
