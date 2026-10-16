@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -14,15 +15,34 @@ namespace WeekNumberLite
 
         internal static Icon Create(int weekNumber)
         {
-            // Keep a minimal calendar header above large, fitted digits.
-            int size = SystemInformation.SmallIconSize.Width;
-            using (Bitmap canvas = new Bitmap(size * 4, size * 4))
+            return Create(weekNumber, SystemInformation.SmallIconSize.Width, GetForegroundColor());
+        }
+
+        internal static Icon Create(int weekNumber, int size, Color color)
+        {
+            using (Bitmap bitmap = Render(weekNumber, size, color))
+            {
+                IntPtr handle = bitmap.GetHicon();
+                try
+                {
+                    using (Icon borrowed = Icon.FromHandle(handle))
+                        return (Icon)borrowed.Clone();
+                }
+                finally { DestroyIcon(handle); }
+            }
+        }
+
+        // Explicit inputs let the production renderer be exercised without changing Windows settings.
+        internal static Bitmap Render(int weekNumber, int size, Color color)
+        {
+            if (weekNumber < 1 || weekNumber > 53) throw new ArgumentOutOfRangeException(nameof(weekNumber));
+            if (size < 16 || size > 256) throw new ArgumentOutOfRangeException(nameof(size));
+            using (Bitmap canvas = new Bitmap(size * 4, size * 4, PixelFormat.Format32bppArgb))
             using (Graphics graphics = Graphics.FromImage(canvas))
             {
                 graphics.Clear(Color.Transparent);
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 graphics.ScaleTransform(canvas.Width / 256f, canvas.Height / 256f);
-                Color color = GetForegroundColor();
                 using (Brush brush = new SolidBrush(color))
                 using (FontFamily family = new FontFamily("Segoe UI"))
                 using (StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone())
@@ -30,15 +50,22 @@ namespace WeekNumberLite
                 {
                     string digits = weekNumber.ToString("D2", CultureInfo.InvariantCulture);
                     // Use a shared scale for all digits so narrow ones keep their shape.
-                    RectangleF digitBounds;
-                    using (GraphicsPath reference = new GraphicsPath())
+                    RectangleF digitBounds = RectangleF.Empty;
+                    for (int value = 0; value <= 9; value++)
                     {
-                        reference.AddString("0", family, (int)FontStyle.Bold, EmSize, Point.Empty, format);
-                        digitBounds = reference.GetBounds();
+                        using (GraphicsPath reference = new GraphicsPath())
+                        {
+                            reference.AddString(value.ToString(CultureInfo.InvariantCulture), family,
+                                (int)FontStyle.Bold, EmSize, Point.Empty, format);
+                            RectangleF bounds = reference.GetBounds();
+                            digitBounds.Width = Math.Max(digitBounds.Width, bounds.Width);
+                            digitBounds.Height = Math.Max(digitBounds.Height, bounds.Height);
+                        }
                     }
-                    float inset = 128f / size;
-                    float top = 768f / size;
-                    float gap = 256f / size;
+                    // Logical 16px layout; preserve its proportions at higher DPI.
+                    float inset = 8;
+                    float top = 48;
+                    float gap = 16;
                     float cellWidth = (256 - inset * 2 - gap) / 2;
                     float scale = Math.Min(cellWidth / digitBounds.Width, (256 - top - inset) / digitBounds.Height);
                     for (int index = 0; index < digits.Length; index++)
@@ -57,35 +84,47 @@ namespace WeekNumberLite
                     }
                     graphics.FillPath(brush, number);
                 }
-                using (Bitmap bitmap = new Bitmap(size, size))
-                using (Graphics target = Graphics.FromImage(bitmap))
+                Bitmap bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+                try
                 {
-                    target.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    target.DrawImage(canvas, 0, 0, size, size);
-                    // Draw the header at the final resolution for crisp one-pixel strokes.
-                    target.SmoothingMode = SmoothingMode.None;
-                    using (Pen header = new Pen(color, 1))
+                    using (Graphics target = Graphics.FromImage(bitmap))
                     {
-                        target.DrawLine(header, 1, 1, size - 2, 1);
-                        target.DrawLine(header, size / 4, 0, size / 4, 2);
-                        target.DrawLine(header, size - 1 - size / 4, 0, size - 1 - size / 4, 2);
+                        target.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        target.DrawImage(canvas, 0, 0, size, size);
+                        // Draw the header at the final resolution for crisp, pixel-aligned strokes.
+                        target.SmoothingMode = SmoothingMode.None;
+                        int stroke = Math.Max(1, (int)Math.Round(size / 16f));
+                        int leftBinding = size / 4;
+                        int rightBinding = size - 1 - leftBinding;
+                        using (Brush header = new SolidBrush(color))
+                        {
+                            target.FillRectangle(header, stroke, stroke, size - 2 * stroke, stroke);
+                            target.FillRectangle(header, leftBinding, 0, stroke, 3 * stroke);
+                            target.FillRectangle(header, rightBinding - stroke + 1, 0, stroke, 3 * stroke);
+                        }
                     }
-                    IntPtr handle = bitmap.GetHicon();
-                    try
-                    {
-                        using (Icon borrowed = Icon.FromHandle(handle))
-                            return (Icon)borrowed.Clone();
-                    }
-                    finally { DestroyIcon(handle); }
+                    return bitmap;
+                }
+                catch
+                {
+                    bitmap.Dispose();
+                    throw;
                 }
             }
         }
 
         private static Color GetForegroundColor()
         {
+            if (SystemInformation.HighContrast) return SystemColors.WindowText;
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
-                return (int)(key == null ? 0 : key.GetValue("SystemUsesLightTheme", 0)) == 1
-                    ? Color.FromArgb(48, 52, 58) : Color.FromArgb(240, 240, 240);
+                return ForegroundForTheme(key == null ? null : key.GetValue("SystemUsesLightTheme"));
+        }
+
+        internal static Color ForegroundForTheme(object value)
+        {
+            // Missing or unexpected registry data must not terminate the tray application.
+            return value is int && (int)value == 1
+                ? Color.FromArgb(48, 52, 58) : Color.FromArgb(240, 240, 240);
         }
 
         [DllImport("user32.dll")]

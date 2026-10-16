@@ -13,3 +13,10 @@ build.bat
 ```
 
 The result is `bin\Release\WeekNumberLite.exe`. To start it automatically, put a shortcut to it into `shell:startup`.
+
+
+## Build validation
+
+Builds require MSBuild and the .NET Framework 4.8 Developer Pack.
+See [Windows build and icon regression](tests/README.md) for local test commands,
+CI artifacts and the desktop acceptance checklist.

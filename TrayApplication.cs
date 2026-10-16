@@ -35,7 +35,9 @@ namespace WeekNumberLite
         private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
         {
             // Switching between light and dark theme is reported as a general preference change.
-            if (e.Category == UserPreferenceCategory.General) Refresh();
+            if (e.Category == UserPreferenceCategory.General ||
+                e.Category == UserPreferenceCategory.Color ||
+                e.Category == UserPreferenceCategory.Accessibility) Refresh();
         }
 
         private void Refresh()
