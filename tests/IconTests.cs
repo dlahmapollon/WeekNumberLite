@@ -70,9 +70,9 @@ internal static class IconTests
                 {
                     string context = name + " week " + week;
                     Check(bitmap.Width == size && bitmap.Height == size && icon.Size == bitmap.Size, context + " dimensions");
-                    Check(bitmap.GetPixel(0,0).A == 0 && bitmap.GetPixel(size-1,size-1).A == 0, context + " transparent corners");
+                    Check(bitmap.GetPixel(0,0).A == 0 && bitmap.GetPixel(size-1,0).A == 0, context + " transparent corners");
                     Check(roundtrip.GetPixel(0,0).A == 0, context + " native transparency");
-                    Check(roundtrip.GetPixel(size/2, size/16).A >= 240, context + " native header opacity");
+                    Check(roundtrip.GetPixel(size/2, size/8 - 1).A >= 240, context + " native header opacity");
                     int[] digitPixels = new int[2];
                     int[] minY = { size, size }, maxY = { 0, 0 };
                     int translucent = 0;
